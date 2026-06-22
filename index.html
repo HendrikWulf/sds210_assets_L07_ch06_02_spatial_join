@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatial Join Visualizer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 850px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        h3 {
+            margin-top: 0;
+            color: #1e293b;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            align-items: stretch;
+        }
+        .map-section {
+            flex: 1;
+            background: #f1f5f9;
+            border-radius: 8px;
+            border: 2px dashed #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 15px;
+            min-height: 250px;
+        }
+        .data-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        svg {
+            width: 100%;
+            height: 250px;
+            overflow: visible;
+        }
+        .poly {
+            fill: rgba(59, 130, 246, 0.2);
+            stroke: #3b82f6;
+            stroke-width: 4;
+        }
+        .point {
+            transition: fill 0.3s ease;
+            stroke: #fff;
+            stroke-width: 2;
+        }
+        .point-label {
+            font-size: 12px;
+            font-weight: bold;
+            fill: #1e293b;
+        }
+        
+        .control-group {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 15px;
+        }
+        .control-label {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #475569;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .toggle-btn {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            color: #475569;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+        .toggle-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #2563eb;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: monospace;
+            font-size: 0.9rem;
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background: #cbd5e1; color: #1e293b; font-weight: bold; }
+        .row-drop { display: none; }
+        .val-nan { color: #94a3b8; font-style: italic; }
+        .val-match { color: #10b981; font-weight: bold; }
+
+        .explanation {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            padding: 12px;
+            border-radius: 4px;
+            color: #0369a1;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            min-height: 60px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3>Spatial Join Visualizer</h3>
+    
+    <div class="main-layout">
+        <div class="map-section">
+            <div style="font-weight:bold; color:#475569; margin-bottom:10px; font-size:0.9rem; text-transform:uppercase;">Map View</div>
+            <svg viewBox="0 0 300 250">
+                <rect class="poly" x="50" y="50" width="150" height="150"></rect>
+                <text x="95" y="130" fill="#2563eb" font-weight="bold" font-family="sans-serif">Valais</text>
+                
+                <circle id="pt-hut1" class="point" cx="100" cy="80" r="8"></circle>
+                <text x="115" y="84" class="point-label">Hut 1</text>
+
+                <circle id="pt-hut2" class="point" cx="200" cy="150" r="8"></circle>
+                <text x="215" y="154" class="point-label">Hut 2</text>
+
+                <circle id="pt-hut3" class="point" cx="250" cy="220" r="8"></circle>
+                <text x="265" y="224" class="point-label">Hut 3</text>
+            </svg>
+        </div>
+
+        <div class="data-section">
+            
+            <div class="control-group">
+                <div class="control-label">Predicate (Geometric Rule)</div>
+                <div style="display:flex; gap:10px;">
+                    <button class="toggle-btn pred-btn active" onclick="setParam('predicate', 'within')">predicate="within"</button>
+                    <button class="toggle-btn pred-btn" onclick="setParam('predicate', 'intersects')">predicate="intersects"</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">Join Type (Unmatched Behavior)</div>
+                <div style="display:flex; gap:10px;">
+                    <button class="toggle-btn how-btn active" onclick="setParam('how', 'inner')">how="inner"</button>
+                    <button class="toggle-btn how-btn" onclick="setParam('how', 'left')">how="left"</button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Point_Name</th>
+                        <th>Joined_Canton</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
+            
+        </div>
+    </div>
+    
+    <div class="explanation" id="explanation"></div>
+</div>
+
+<script>
+    let currentPredicate = 'within';
+    let currentHow = 'inner';
+
+    function setParam(type, val) {
+        if (type === 'predicate') {
+            currentPredicate = val;
+            document.querySelectorAll('.pred-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        } else {
+            currentHow = val;
+            document.querySelectorAll('.how-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+        updateJoin();
+    }
+
+    function updateJoin() {
+        // Logic for Matches
+        // Hut 1 is always in. Hut 3 is always out. Hut 2 depends on predicate.
+        let match1 = true;
+        let match2 = currentPredicate === 'intersects'; // touches border
+        let match3 = false;
+
+        // Update Map Colors
+        document.getElementById('pt-hut1').style.fill = match1 ? '#10b981' : '#ef4444';
+        document.getElementById('pt-hut2').style.fill = match2 ? '#10b981' : '#ef4444';
+        document.getElementById('pt-hut3').style.fill = match3 ? '#10b981' : '#ef4444';
+
+        // Render Table Rows
+        let tbody = '';
+        const pts = [
+            { id: 'Hut 1', match: match1 },
+            { id: 'Hut 2', match: match2 },
+            { id: 'Hut 3', match: match3 }
+        ];
+
+        pts.forEach(p => {
+            if (p.match) {
+                tbody += `<tr><td>${p.id}</td><td class="val-match">Valais</td></tr>`;
+            } else {
+                if (currentHow === 'left') {
+                    tbody += `<tr><td>${p.id}</td><td class="val-nan">NaN</td></tr>`;
+                }
+            }
+        });
+        document.getElementById('table-body').innerHTML = tbody;
+
+        // Update Explanation
+        let predText = currentPredicate === 'within' 
+            ? "<b>within:</b> Points must be strictly inside the polygon. <i>Hut 2</i> touches the border, so it fails." 
+            : "<b>intersects:</b> Points only need to touch the polygon. <i>Hut 2</i> on the border now succeeds!";
+        
+        let howText = currentHow === 'inner'
+            ? "<b>inner:</b> Unmatched points are completely deleted from the results table."
+            : "<b>left:</b> Unmatched points are kept in the table, but assigned <code>NaN</code> for the joined polygon attributes.";
+
+        document.getElementById('explanation').innerHTML = `${predText}<br><br>${howText}`;
+    }
+
+    // Initialize
+    updateJoin();
+</script>
+
+</body>
+</html>
